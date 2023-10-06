@@ -12,6 +12,11 @@ from .exceptions import AuthException, RequestException
 
 _LOGGER = logging.getLogger(__name__)
 
+from enum import Enum
+
+class FrankCountry(Enum):
+    Netherlands = 1
+    Belgium = 2
 
 @dataclass
 class Authentication:
@@ -109,6 +114,7 @@ class User:
     lastMeterReadingDate: str
     advancedPaymentAmount: float
     hasCO2Compensation: bool
+    siteReference: str
 
     @staticmethod
     def from_dict(data: dict[str, str]) -> User:
@@ -128,6 +134,7 @@ class User:
             lastMeterReadingDate=payload.get("lastMeterReadingDate"),
             advancedPaymentAmount=payload.get("advancedPaymentAmount"),
             hasCO2Compensation=payload.get("hasCO2Compensation"),
+            siteReference=payload.get("deliverySites")[0].get("reference") if "deliverySites" in payload else None,
         )
 
 
@@ -190,8 +197,8 @@ class Price:
 
         self.market_price = data["marketPrice"]
         self.market_price_tax = data["marketPriceTax"]
-        self.sourcing_markup_price = data["sourcingMarkupPrice"]
-        self.energy_tax_price = data["energyTaxPrice"]
+        self.sourcing_markup_price = data["sourcingMarkupPrice"] if "sourcingMarkupPrice" in data else data["consumptionSourcingMarkupPrice"]
+        self.energy_tax_price = data["energyTaxPrice"] if "energyTaxPrice" in data else data["energyTax"]
 
     def __str__(self) -> str:
         """Return a string representation of this price entry."""

@@ -9,7 +9,14 @@ from typing import Any
 from aiohttp.client import ClientError, ClientSession
 
 from .exceptions import AuthException, AuthRequiredException
-from .models import Authentication, Invoices, MarketPrices, MonthSummary, User
+from .models import (
+    Authentication,
+    Invoices,
+    MarketPrices,
+    MonthSummary,
+    User,
+    FrankCountry,
+)
 
 
 class FrankEnergie:
@@ -22,11 +29,14 @@ class FrankEnergie:
         clientsession: ClientSession = None,
         auth_token: str | None = None,
         refresh_token: str | None = None,
+        country: FrankCountry | None = FrankCountry.Netherlands,
     ):
         """Initialize the FrankEnergie client."""
+        self._country = country
         self._close_session: bool = False
         self._auth: Authentication | None = None
         self._session = clientsession
+        self._siteReference = None
 
         if auth_token is not None or refresh_token is not None:
             self._auth = Authentication(auth_token, refresh_token)
@@ -74,6 +84,11 @@ class FrankEnergie:
         }
 
         self._auth = Authentication.from_dict(await self._query(query))
+
+        if self._country == FrankCountry.Belgium and self._siteReference is None:
+            me = await self.user()
+            self._siteReference = me.siteReference
+
         return self._auth
 
     async def renew_token(self) -> Authentication:
@@ -98,6 +113,11 @@ class FrankEnergie:
         }
 
         self._auth = Authentication.from_dict(await self._query(query))
+
+        if self._country == FrankCountry.Belgium and self._siteReference is None:
+            me = await self.user()
+            self._siteReference = me.siteReference
+
         return self._auth
 
     async def month_summary(self) -> MonthSummary:
@@ -163,8 +183,9 @@ class FrankEnergie:
         if self._auth is None:
             raise AuthRequiredException
 
-        query = {
-            "query": """
+        queries = {
+            FrankCountry.Netherlands: {
+                "query": """
                 query Me {
                     me {
                         ...UserFields
@@ -179,9 +200,17 @@ class FrankEnergie:
                     hasCO2Compensation
                 }
             """,
-            "operationName": "Me",
-            "variables": {},
+                "operationName": "Me",
+                "variables": {},
+            },
+            FrankCountry.Belgium: {
+                "query": "query Me($siteReference: String) {\n  me {\n    ...UserFields\n  }\n}\n\nfragment UserFields on User {\n  id\n  email\n  countryCode\n  advancedPaymentAmount(siteReference: $siteReference)\n  treesCount\n  hasInviteLink\n  hasCO2Compensation\n  notification\n  createdAt\n  deliverySites {\n    reference }\n}\n",
+                "variables": {"siteReference": None},
+                "operationName": "Me",
+            },
         }
+
+        query = queries[self._country]
 
         return User.from_dict(await self._query(query))
 
@@ -221,8 +250,9 @@ class FrankEnergie:
         if self._auth is None:
             raise AuthRequiredException
 
-        query_data = {
-            "query": """
+        queries = {
+            FrankCountry.Netherlands: {
+                "query": """
                 query CustomerMarketPrices($date: String!) {
                     customerMarketPrices(date: $date) {
                         electricityPrices {
@@ -244,9 +274,20 @@ class FrankEnergie:
                     }
                 }
             """,
-            "variables": {"date": str(start_date)},
-            "operationName": "CustomerMarketPrices",
+                "variables": {"date": str(start_date)},
+                "operationName": "CustomerMarketPrices",
+            },
+            FrankCountry.Belgium: {
+                "query": "query MarketPrices($date: String!, $siteReference: String!) {\n  customerMarketPrices(date: $date, siteReference: $siteReference) {\n    id\n    electricityPrices {\n      id\n      from\n      till\n      date\n      marketPrice\n      marketPriceTax\n      consumptionSourcingMarkupPrice\n      energyTax\n      perUnit\n    }\n    gasPrices {\n      id\n      from\n      till\n      date\n      marketPrice\n      marketPriceTax\n      consumptionSourcingMarkupPrice\n      energyTax\n      perUnit\n    }\n  }\n}\n",
+                "variables": {
+                    "siteReference": self._siteReference,
+                    "date": str(start_date),
+                },
+                "operationName": "MarketPrices",
+            },
         }
+
+        query_data = queries[self._country]
 
         return MarketPrices.from_userprices_dict(await self._query(query_data))
 
