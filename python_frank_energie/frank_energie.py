@@ -85,9 +85,7 @@ class FrankEnergie:
 
         self._auth = Authentication.from_dict(await self._query(query))
 
-        if self._country == FrankCountry.Belgium and self._siteReference is None:
-            me = await self.user()
-            self._siteReference = me.siteReference
+        await self._load_site_reference()
 
         return self._auth
 
@@ -114,11 +112,19 @@ class FrankEnergie:
 
         self._auth = Authentication.from_dict(await self._query(query))
 
+        await self._load_site_reference()
+
+        return self._auth
+    
+    async def _load_site_reference(self):
+        if self._auth is None:
+            raise AuthRequiredException
+        
         if self._country == FrankCountry.Belgium and self._siteReference is None:
             me = await self.user()
             self._siteReference = me.siteReference
-
-        return self._auth
+        else:
+            return
 
     async def month_summary(self) -> MonthSummary:
         """Get month summary data."""
@@ -249,6 +255,8 @@ class FrankEnergie:
         """Get customer market prices."""
         if self._auth is None:
             raise AuthRequiredException
+        
+        self._load_site_reference()
 
         queries = {
             FrankCountry.Netherlands: {
