@@ -256,7 +256,7 @@ class FrankEnergie:
         if self._auth is None:
             raise AuthRequiredException
         
-        self._load_site_reference()
+        await self._load_site_reference()
 
         queries = {
             FrankCountry.Netherlands: {
