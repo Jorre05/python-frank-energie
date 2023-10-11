@@ -50,9 +50,9 @@ class FrankEnergie:
             resp = await self._session.post(
                 self.DATA_URL,
                 json=query,
-                headers={"Authorization": f"Bearer {self._auth.authToken}"}
+                headers={"Authorization": f"Bearer {self._auth.authToken}", "X-Country": self._country.value}
                 if self._auth is not None
-                else None,
+                else {"X-Country": self._country.value},
             )
 
             response = await resp.json()
@@ -224,30 +224,40 @@ class FrankEnergie:
         self, start_date: date, end_date: date | None = None
     ) -> MarketPrices:
         """Get market prices."""
-        query_data = {
-            "query": """
-                query MarketPrices($startDate: Date!, $endDate: Date!) {
-                    marketPricesElectricity(startDate: $startDate, endDate: $endDate) {
-                       from
-                       till
-                       marketPrice
-                       marketPriceTax
-                       sourcingMarkupPrice
-                       energyTaxPrice
+
+        queries = {
+            FrankCountry.Netherlands: {
+                "query": """
+                    query MarketPrices($startDate: Date!, $endDate: Date!) {
+                        marketPricesElectricity(startDate: $startDate, endDate: $endDate) {
+                        from
+                        till
+                        marketPrice
+                        marketPriceTax
+                        sourcingMarkupPrice
+                        energyTaxPrice
+                        }
+                        marketPricesGas(startDate: $startDate, endDate: $endDate) {
+                        from
+                        till
+                        marketPrice
+                        marketPriceTax
+                        sourcingMarkupPrice
+                        energyTaxPrice
+                        }
                     }
-                    marketPricesGas(startDate: $startDate, endDate: $endDate) {
-                       from
-                       till
-                       marketPrice
-                       marketPriceTax
-                       sourcingMarkupPrice
-                       energyTaxPrice
-                    }
-                }
-            """,
-            "variables": {"startDate": str(start_date), "endDate": str(end_date)},
-            "operationName": "MarketPrices",
+                """,
+                "variables": {"startDate": str(start_date), "endDate": str(end_date)},
+                "operationName": "MarketPrices",
+        },
+            FrankCountry.Belgium: {
+                "query": "query MarketPrices($date: String!) {\n  marketPrices(date: $date) {\n    electricityPrices {\n      from\n      till\n      marketPrice\n      marketPriceTax\n      sourcingMarkupPrice\n      energyTaxPrice\n      perUnit\n    }\n    gasPrices {\n      from\n      till\n      marketPrice\n      marketPriceTax\n      sourcingMarkupPrice\n      energyTaxPrice\n      perUnit\n    }\n  }\n}\n",
+                "variables":{"date": str(start_date)},
+                "operationName":"MarketPrices",
+            }
         }
+
+        query_data = queries[self._country]
 
         return MarketPrices.from_dict(await self._query(query_data))
 

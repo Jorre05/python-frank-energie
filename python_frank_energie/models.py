@@ -15,8 +15,8 @@ _LOGGER = logging.getLogger(__name__)
 from enum import Enum
 
 class FrankCountry(Enum):
-    Netherlands = 1
-    Belgium = 2
+    Netherlands = 'NL'
+    Belgium = 'BE'
 
 @dataclass
 class Authentication:
@@ -323,10 +323,13 @@ class MarketPrices:
         payload = data.get("data")
         if not payload:
             raise RequestException("Unexpected response")
+        
+        electricityPayload = payload.get("marketPricesElectricity") if "marketPricesElectricity" in payload else payload.get("marketPrices").get('electricityPrices')
+        gasPayload = payload.get("marketPricesGas") if "marketPricesGas" in payload else payload.get("marketPrices").get('gasPrices')
 
         return MarketPrices(
-            electricity=PriceData(payload.get("marketPricesElectricity")),
-            gas=PriceData(payload.get("marketPricesGas")),
+            electricity=PriceData(electricityPayload),
+            gas=PriceData(gasPayload),
         )
 
     @staticmethod
