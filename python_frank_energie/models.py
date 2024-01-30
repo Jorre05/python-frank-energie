@@ -6,6 +6,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
+import jwt
 from dateutil import parser
 
 from .exceptions import AuthException, RequestException
@@ -50,6 +51,18 @@ class Authentication:
             authToken=payload.get("authToken"),
             refreshToken=payload.get("refreshToken"),
         )
+
+    def authTokenValid(self, tz: timezone = timezone.utc) -> bool:
+        """Return that authToken is valid according to expiration time."""
+        authTokenDecoded = jwt.decode(
+            self.authToken,
+            verify=True,
+            algorithms=["HS256"],
+            options={"verify_signature": False},
+        )
+        return datetime.fromtimestamp(
+            authTokenDecoded["exp"], tz=timezone.utc
+        ) > datetime.now(tz=tz)
 
 
 @dataclass
@@ -109,6 +122,7 @@ class Invoices:
 class User:
     """User data, including the current status of the connection."""
 
+    id: str
     connectionsStatus: str
     firstMeterReadingDate: str
     lastMeterReadingDate: str
@@ -129,6 +143,7 @@ class User:
             raise RequestException("Unexpected response")
 
         return User(
+            id=payload.get("id"),
             connectionsStatus=payload.get("connectionsStatus"),
             firstMeterReadingDate=payload.get("firstMeterReadingDate"),
             lastMeterReadingDate=payload.get("lastMeterReadingDate"),

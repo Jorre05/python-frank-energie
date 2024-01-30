@@ -58,12 +58,9 @@ jobs:
           - id: trailing-whitespace
             name: Trim Trailing Whitespace
           - id: vulture
-            name: Check for unused Python code
-          - id: yamllint
-            name: Check YAML style
     steps:
       - name: Check out code from GitHub
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set up Python 3.10
         id: python
         uses: actions/setup-python@v4
