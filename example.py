@@ -42,10 +42,11 @@ async def main():
             print(f"Gas: {price.date_from} -> {price.date_till}: {price.total}")
 
         print(await fe.month_summary())
+        print(await fe.invoices())
 
-    async with FrankEnergie(auth_token=authToken.authToken) as fe:
-        print(await fe.month_summary())
-        print(await fe.user())
+    # async with FrankEnergie(auth_token=authToken.authToken) as fe:
+    #     print(await fe.month_summary())
+    #     print(await fe.user())
 
 
 asyncio.run(main())

@@ -50,7 +50,10 @@ class FrankEnergie:
             resp = await self._session.post(
                 self.DATA_URL,
                 json=query,
-                headers={"Authorization": f"Bearer {self._auth.authToken}", "X-Country": self._country.value}
+                headers={
+                    "Authorization": f"Bearer {self._auth.authToken}",
+                    "X-Country": self._country.value,
+                }
                 if self._auth is not None
                 else {"X-Country": self._country.value},
             )
@@ -115,11 +118,11 @@ class FrankEnergie:
         await self._load_site_reference()
 
         return self._auth
-    
+
     async def _load_site_reference(self):
         if self._auth is None:
             raise AuthRequiredException
-        
+
         if self._country == FrankCountry.Belgium and self._siteReference is None:
             me = await self.user()
             self._siteReference = me.siteReference
@@ -131,8 +134,11 @@ class FrankEnergie:
         if self._auth is None:
             raise AuthRequiredException
 
-        query = {
-            "query": """
+        await self._load_site_reference()
+
+        queries = {
+            FrankCountry.Netherlands: {
+                "query": """
                 query MonthSummary {
                     monthSummary {
                         actualCostsUntilLastMeterReadingDate
@@ -142,11 +148,19 @@ class FrankEnergie:
                     }
                 }
             """,
-            "operationName": "MonthSummary",
-            "variables": {},
+                "operationName": "MonthSummary",
+                "variables": {},
+            },
+            FrankCountry.Belgium: {
+                "query": "query MonthSummary($siteReference: String!) {\n  monthSummary(siteReference: $siteReference) {\n    _id\n    lastMeterReadingDate\n    expectedCostsUntilLastMeterReadingDate\n    actualCostsUntilLastMeterReadingDate\n    meterReadingDayCompleteness\n    gasExcluded\n  }\n}\n",
+                "variables": {"siteReference": self._siteReference},
+                "operationName": "MonthSummary",
+            },
         }
 
-        return MonthSummary.from_dict(await self._query(query))
+        query_data = queries[self._country]
+
+        return MonthSummary.from_dict(await self._query(query_data))
 
     async def invoices(self) -> Invoices:
         """Get invoices data.
@@ -156,8 +170,11 @@ class FrankEnergie:
         if self._auth is None:
             raise AuthRequiredException
 
-        query = {
-            "query": """
+        await self._load_site_reference()
+
+        queries = {
+            FrankCountry.Netherlands: {
+                "query": """
                 query Invoices {
                     invoices {
                         previousPeriodInvoice {
@@ -178,11 +195,19 @@ class FrankEnergie:
                     }
                 }
             """,
-            "operationName": "Invoices",
-            "variables": {},
+                "operationName": "Invoices",
+                "variables": {},
+            },
+            FrankCountry.Belgium: {
+                "query": "query Invoices($siteReference: String!) {\n  invoices(siteReference: $siteReference) {\n    _id\n    previousPeriodInvoice {\n      id\n      StartDate\n      PeriodDescription\n      TotalAmount\n      __typename\n    }\n    currentPeriodInvoice {\n      id\n      StartDate\n      PeriodDescription\n      TotalAmount\n      __typename\n    }\n    upcomingPeriodInvoice {\n      id\n      StartDate\n      PeriodDescription\n      TotalAmount\n      __typename\n    }\n    allInvoices {\n      id\n      StartDate\n      PeriodDescription\n      TotalAmount\n      __typename\n    }\n    __typename\n  }\n}",
+                "variables": {"siteReference": self._siteReference},
+                "operationName": "Invoices",
+            },
         }
 
-        return Invoices.from_dict(await self._query(query))
+        query_data = queries[self._country]
+
+        return Invoices.from_dict(await self._query(query_data))
 
     async def user(self) -> User:
         """Get user data."""
@@ -249,12 +274,12 @@ class FrankEnergie:
                 """,
                 "variables": {"startDate": str(start_date), "endDate": str(end_date)},
                 "operationName": "MarketPrices",
-        },
+            },
             FrankCountry.Belgium: {
                 "query": "query MarketPrices($date: String!) {\n  marketPrices(date: $date) {\n    electricityPrices {\n      from\n      till\n      marketPrice\n      marketPriceTax\n      sourcingMarkupPrice\n      energyTaxPrice\n      perUnit\n    }\n    gasPrices {\n      from\n      till\n      marketPrice\n      marketPriceTax\n      sourcingMarkupPrice\n      energyTaxPrice\n      perUnit\n    }\n  }\n}\n",
-                "variables":{"date": str(start_date)},
-                "operationName":"MarketPrices",
-            }
+                "variables": {"date": str(start_date)},
+                "operationName": "MarketPrices",
+            },
         }
 
         query_data = queries[self._country]
@@ -265,7 +290,7 @@ class FrankEnergie:
         """Get customer market prices."""
         if self._auth is None:
             raise AuthRequiredException
-        
+
         await self._load_site_reference()
 
         queries = {
